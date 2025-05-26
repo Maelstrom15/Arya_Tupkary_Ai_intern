@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Support Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f9; /* Gemini-like light blue/gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        #chat-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 40px);
+            max-height: 800px; /* Max height for the chat window */
+            width: 100%;
+            max-width: 768px; /* Max width */
+            margin: 20px;
+            background-color: #ffffff; /* White chat area */
+            border-radius: 16px; /* More rounded corners */
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1); /* Softer shadow */
+            overflow: hidden;
+        }
+        #chat-header {
+            padding: 16px 24px;
+            background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+        }
+        #chat-header img {
+            width: 32px;
+            height: 32px;
+            margin-right: 12px;
+            border-radius: 50%;
+        }
+        #chat-header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        #chatbox {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px; /* Increased gap */
+        }
+        .message {
+            padding: 12px 18px; /* Slightly more padding */
+            border-radius: 18px; /* More rounded bubbles */
+            max-width: 75%; /* Slightly wider max-width */
+            word-wrap: break-word;
+            line-height: 1.6;
+        }
+        .user-message {
+            background-color: #4285F4; /* Gemini blue */
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px; /* Characteristic notch */
+        }
+        .bot-message, .system-message {
+            background-color: #e8f0fe; /* Lighter blue for bot/system */
+            color: #1f2937;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px; /* Characteristic notch */
+            display: flex; /* For icon alignment */
+            align-items: flex-start;
+        }
+        .bot-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            margin-top: 2px; /* Align with first line of text */
+            flex-shrink: 0;
+        }
+        .system-message {
+            background-color: #f1f3f4; /* Lighter gray for system messages */
+            color: #5f6368; /* Darker gray text */
+            font-style: normal;
+            font-size: 0.875em;
+        }
+        .bot-message.error-message {
+            background-color: #fce8e6; /* Light red for errors */
+            color: #c5221f;
+        }
+        .bot-message.loading-message {
+            background-color: #e8f0fe;
+            color: #1967d2;
+            font-style: italic;
+        }
+        #input-area {
+            display: flex;
+            align-items: center; /* Vertically align items */
+            padding: 16px 24px;
+            border-top: 1px solid #e0e0e0;
+            background-color: #ffffff;
+        }
+        #user-input {
+            flex-grow: 1;
+            padding: 14px 18px; /* Increased padding */
+            border: 1px solid #dadce0; /* Lighter border */
+            border-radius: 24px; /* Pill shape */
+            margin-right: 12px;
+            font-size: 1rem;
+            background-color: #f1f3f4; /* Light gray input background */
+        }
+        #user-input:focus {
+            outline: none;
+            border-color: #4285F4;
+            background-color: #ffffff;
+        }
+        #send-button {
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 50%; /* Circular button */
+            width: 48px; /* Fixed size */
+            height: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        #send-button:hover {
+            background-color: #1a73e8; /* Darker blue on hover */
+        }
+        #send-button svg {
+            width: 24px;
+            height: 24px;
+        }
+        .typing-indicator span { /* ... (same as before) ... */ }
+        @keyframes bounce { /* ... (same as before) ... */ }
+
+        /* FAQ Topic Chips Styles */
+        #faq-topic-chips-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px; /* Smaller gap */
+            padding: 12px 24px 16px 24px; /* Adjusted padding */
+            border-bottom: 1px solid #e0e0e0;
+            background-color: #ffffff;
+        }
+        .topic-chip {
+            background-color: #e8f0fe; /* Light blue background */
+            color: #1967d2; /* Blue text */
+            padding: 8px 16px; /* More padding for better touch targets */
+            border-radius: 20px;
+            font-size: 0.875rem; /* Slightly smaller font */
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #d2e3fc; /* Light blue border */
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .topic-chip:hover {
+            background-color: #d2e3fc; /* Slightly darker blue on hover */
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        .clickable-question-in-chat, .clickable-order-id-in-chat {
+            background-color: #e8f0fe; /* Light blue to match bot messages */
+            color: #1967d2;
+            padding: 10px 16px;
+            border-radius: 18px;
+            border: 1px solid #d2e3fc;
+            cursor: pointer;
+            margin-top: 6px;
+            margin-left: 0px; /* No extra indent, align with system messages */
+            align-self: flex-start;
+            max-width: 75%;
+            font-size: 0.9rem;
+            text-align: left;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .clickable-question-in-chat:hover, .clickable-order-id-in-chat:hover {
+            background-color: #d2e3fc;
+            border-color: #a8c7fa;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="chat-header">
+            <img src="https://placehold.co/40x40/4285F4/FFFFFF?text=AI&font=Inter" alt="Bot Icon">
+            <h1>Support Assistant</h1>
+        </div>
+
+        <div id="faq-topic-chips-container">
+            </div>
+
+        <div id="chatbox">
+            </div>
+        <div id="input-area">
+            <input type="text" id="user-input" placeholder="Message Support Assistant...">
+            <button id="send-button" aria-label="Send message">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const chatbox = document.getElementById('chatbox');
+        const faqTopicChipsContainer = document.getElementById('faq-topic-chips-container');
+
+        const apiKey = "";
+        const VERIFICATION_CODE = "0000";
+        let orderTrackingHintShown = false;
+
+        const faqData = {
+            "Product Specifications": [
+                { "id": "spec_smartphone_latest", "productName": "Nova X Pro", "keywords": ["latest smartphone", "new phone", "current phone specs", "nova x pro"], "question": "What are the specifications of the latest smartphone (Nova X Pro)?", "answer": "Our latest smartphone, the 'Nova X Pro' 📱, features: \nDisplay: 6.8-inch Dynamic AMOLED 2X (120Hz refresh rate) \n⚙️ Processor: Snapdragon 9 Gen 1 \n💾 RAM: 12GB \n💽 Storage: 256GB/512GB options \n📷 Camera: 108MP Main, 50MP Ultrawide, 12MP Telephoto \n🔋 Battery: 5000mAh with 65W fast charging." },
+                { "id": "spec_laptop_latest", "productName": "ZenithBook Air 15", "keywords": ["latest laptop", "new laptop", "current laptop specs", "zenithbook air 15"], "question": "What are the specifications of the latest laptop (ZenithBook Air 15)?", "answer": "Our newest laptop, the 'ZenithBook Air 15' 💻, boasts: \nDisplay: 15.6-inch QHD+ IPS \n⚙️ Processor: Intel Core i7 (14th Gen) \n💾 RAM: 16GB DDR5 (upgradeable to 32GB) \n💽 Storage: 1TB NVMe SSD \n🎮 Graphics: NVIDIA GeForce RTX 4050 \n🔋 Battery: Up to 12 hours \nPorts: Thunderbolt 4, Backlit Keyboard." },
+                { "id": "spec_headphones_noise_cancelling", "productName": "SereneSound Pro", "keywords": ["noise cancelling headphones", "anc headphones", "serenesound pro"], "question": "Tell me about your noise-cancelling headphones (SereneSound Pro).", "answer": "Our 'SereneSound Pro' headphones 🎧 offer: \n🤫 Noise Cancellation: Industry-leading Active Noise Cancellation \n☁️ Comfort: Plush memory foam earcups \n🔗 Connectivity: Bluetooth 5.2 with multi-device pairing \n🔋 Battery: Up to 30 hours playtime \n🎙️ Calls: Crystal-clear call quality with built-in microphones." }
+            ],
+            "Order Tracking": [
+                { "id": "track_order_how", "keywords": ["track order", "where is my order", "order status", "tracking"], "question": "How can I track my order?", "answer": "You can track your order using your order ID. If you have it, please provide it like 'track my order #ORDERID'. Alternatively, type '0000' to see a list of your recent orders if you've verified." }
+            ],
+            "Return Policy": [
+                {
+                    "id": "return_policy_details",
+                    "keywords": ["return policy", "exchange policy", "refund", "how to return"],
+                    "question": "What is the company's return policy?",
+                    "answer": "🔄 **Return & Exchange Window:** You can request a refund or exchange within 30 days of your purchase. After 30 days, refunds/exchanges are not offered.\n\n" +
+                              "✅ **Eligibility:**\n" +
+                              "  - Item must be unused and in the same condition you received it.\n" +
+                              "  - Item must be in its original packaging.\n" +
+                              "  - A receipt or proof of purchase is required.\n\n" +
+                              "🚫 **Non-Refundable Items:**\n" +
+                              "  - Sale items.\n" +
+                              "  - Gift cards.\n" +
+                              "  - Certain health and personal care items.\n\n" +
+                              "🎁 **Gift Returns:** If your item was a gift shipped directly to you, you'll receive a gift credit for its value upon return.\n\n" +
+                              "🛠️ **Exchanges (Defective/Damaged Items Only):** We only replace items if they are defective or damaged. To exchange for the same item, email us at [Your Company Email Address] and send your item to: [Your Company Return Address].\n\n" +
+                              "🔍 **Return Process & Inspection:**\n" +
+                              "  - Once we receive and inspect your return, we'll email you about its receipt and the approval/rejection of your refund.\n" +
+                              "  - If approved, your refund will be processed to your original payment method within a few business days (timing may vary by bank/card issuer).\n\n" +
+                              "❓ **Late or Missing Refunds:**\n" +
+                              "  1. Check your bank account.\n" +
+                              "  2. Contact your credit card company (refunds may take time to post officially).\n" +
+                              "  3. If you've done this and still haven't received your refund, please contact us at [Your Company Email/Phone Number].\n\n" +
+                              "🚚 **Shipping Your Return:**\n" +
+                              "  - Send returns to: [Your Company Return Address] (Do NOT send to the manufacturer).\n" +
+                              "  - You are responsible for your own return shipping costs.\n" +
+                              "  - Original shipping costs are non-refundable.\n" +
+                              "  - If you receive a refund, the cost of return shipping will be deducted from it.\n" +
+                              "  - Consider using a trackable shipping service, as we can't guarantee receipt of your returned item."
+                }
+            ],
+            "Payment Methods": [
+                {
+                    "id": "payment_methods_available",
+                    "keywords": ["payment methods", "pay for order", "accepted cards", "payment options"],
+                    "question": "What payment methods are available for online purchases?",
+                    "answer": "💳 **Understanding Your Payment Options:**\n" +
+                              "We aim to provide a variety of convenient and secure payment methods. Here's a general overview:\n\n" +
+                              "**Commonly Accepted Methods:**\n" +
+                              "  - **Credit/Debit Cards:** We accept major cards like Visa, Mastercard, American Express (Amex), and Discover. These are processed through secure gateways like Stripe or Adyen.\n" +
+                              "  - **Digital Wallets:** Options like PayPal, Apple Pay, and Google Pay offer quick and secure checkout.\n\n" +
+                              "**Additional Options (May Vary):**\n" +
+                              "  - **Installment Payments:** For larger purchases (e.g., over €100 or equivalent), we may offer 'Buy Now, Pay Later' options in installments (e.g., 3x or 4x) through services like Klarna or Alma.\n" +
+                              "  - **For Business/Professional Clients:** Depending on the transaction, options like payment by Check or Bank Transfer (e.g., via Fintecture) might be available.\n" +
+                              "  - **For Government/Public Sector:** Mandat Administratif may be supported for eligible entities.\n\n" +
+                              "💡 **Key Considerations:**\n" +
+                              "  - **Fees:** Be aware of any potential transaction or installment fees associated with certain payment methods. We strive for transparency.\n" +
+                              "  - **Security:** All transactions are processed securely. We do not store your full payment details.\n" +
+                              "  - **Refunds & Cancellations:** Refund processing times can vary depending on the payment method and your bank/card issuer.\n\n" +
+                              "ℹ️ **Finding Information:**\n" +
+                              "  - Accepted payment methods are usually displayed with icons in our website's footer and prominently at checkout.\n" +
+                              "  - For detailed terms or if you have specific questions about a payment method not listed, please don't hesitate to ask or contact our support team.\n\n" +
+                              "If you encounter any issues during payment or have further questions, please contact us through chat, email at [Your Company Support Email], or call us at [Your Company Phone Number]."
+                }
+            ],
+            "Warranty Information": [ // Updated Warranty Information
+                {
+                    "id": "warranty_details_general",
+                    "keywords": ["warranty", "product guarantee", "defective product", "warranty policy", "claim warranty"],
+                    "question": "What is the warranty information for your products?",
+                    "answer": "🛡️ **[Your Company Name] Warranty Policy Overview:**\n" +
+                              "[Your Company Name] warrants that any [Your Company Name] hardware product you purchase is free from defects in materials and workmanship under normal use during the specified warranty period. Our service arm, [Your Company Service Arm], covers tech defects related to components, software, or user interface when purchased directly from us or an authorized reseller. No warranties apply after the limited warranty period expires, unless extended.\n\n" +
+                              "✅ **Warranty is Applicable ONLY When:**\n" +
+                              "  - Product is for personal use.\n" +
+                              "  - Product is within its warranty period.\n" +
+                              "  - Original purchase invoice/bill (tax paid) is available and shown.\n" +
+                              "  - Warranty and serial number stickers are intact and not tampered with.\n" +
+                              "  - Product has not been opened/attempted to be repaired outside [Your Company Service Arm] authorized centers/engineers.\n" +
+                              "  - Product PCBA & components are not damaged, burnt, rusted, water-logged, tampered, etc.\n\n" +
+                              "🚫 **Warranty Ceases If:**\n" +
+                              "  - Any remarking on the product (e.g., date of sale mentioned by unauthorized party).\n" +
+                              "  - Attempts to modify the actual product or tamper with [Your Company Name] logo.\n" +
+                              "  - Product is used for commercial purposes (unless specified otherwise).\n" +
+                              "  - Resale of product after use.\n" +
+                              "  - Missing or altered service tags/serial numbers.\n" +
+                              "  - Improper use (not as per instructions), or failure to perform preventive maintenance.\n" +
+                              "  - Product not purchased from [Your Company Name] or its authorized sales channels.\n" +
+                              "  - Product operated in a non-recommended environment.\n" +
+                              "  - Servicing not authorized by [Your Company Name].\n" +
+                              "  - Non-[Your Company Name] approved accessories assembled in a system.\n" +
+                              "  - Defects from external causes (lightning, surge, accident, abuse, misuse, normal wear & tear, viruses not introduced by us).\n" +
+                              "  - Software issues (OS, third-party software, or reloading of software).\n" +
+                              "  - Products for which payment has not been received.\n\n" +
+                              "🛠️ **How to Avail Warranty Service:**\n" +
+                              "  - Contact [Your Company Name] or an approved Service Provider. Find a list at: [Your Company Service Center URL, e.g., yourcompany.com/service-centers].\n" +
+                              "  - Service availability may vary by location.\n\n" +
+                              "👤 **Customer Responsibilities for Warranty Service:**\n" +
+                              "  - Follow service request procedures.\n" +
+                              "  - Keep original bills.\n" +
+                              "  - Backup all programs and data.\n" +
+                              "  - Provide system keys/passwords if needed.\n" +
+                              "  - Ensure safe access for on-site service (if applicable).\n" +
+                              "  - Remove/modify confidential data ([Your Company Name] is not responsible for data loss/disclosure).\n\n" +
+                              "📋 **Types of Warranty Service:**\n" +
+                              "  1. **Dead On Arrival (DOA):** Within 15 days of purchase. Product must be in dead condition (does not turn on), with intact packing/accessories, and in brand new condition. Submit to a [Your Company Service Arm] center. Confirmed DOA eligible for new replacement.\n" +
+                              "  2. **Under Warranty (UW):** Duration between DOA and Out Of Warranty. Get service for tech defects.\n" +
+                              "     - *Carry-In Service:* Visit a [Your Company Service Arm] center.\n" +
+                              "     - *On-site Service:* Available in select cities for specific products. Engineers visit your location.\n" +
+                              "  3. **Out Of Warranty (OOW):** After warranty expires. Repairs at [Your Company Service Arm] centers are chargeable. Service/parts subject to availability. May offer an upgraded/refurbished product at a cost.\n\n" +
+                              "For any warranty-related questions, please contact us!"
+                }
+            ]
+        };
+        const reviewData = { /* ... (reviewData remains the same) ... */
+          "reviews": [
+            { "productId": "nova_x_pro", "productName": "Nova X Pro Smartphone", "reviewId": "rev001", "reviewer": "TechGuru88", "date": "2024-05-15", "rating": 5, "sentiment": "positive", "title": "Absolutely Stunning Phone!", "text": "The Nova X Pro is a masterpiece. The camera quality is out of this world, especially in low light. Performance is buttery smooth, and the display is vibrant. Battery easily lasts me a full day of heavy use. Highly recommend!" },
+            { "productId": "nova_x_pro", "productName": "Nova X Pro Smartphone", "reviewId": "rev002", "reviewer": "CasualUser23", "date": "2024-05-10", "rating": 4, "sentiment": "positive", "title": "Great phone, a bit pricey", "text": "Really enjoy using the Nova X Pro. It's fast, takes great pictures, and feels premium. My only gripe is the price point, it's definitely on the higher side. But if you can afford it, it's worth it." },
+            { "productId": "nova_x_pro", "productName": "Nova X Pro Smartphone", "reviewId": "rev003", "reviewer": "GamerGal", "date": "2024-04-28", "rating": 3, "sentiment": "neutral", "title": "Good for most things, but...", "text": "It's a solid phone for everyday tasks and the camera is good. However, for intense gaming sessions, it tends to get a bit warm after a while. Not a dealbreaker, but something to be aware of." },
+            { "productId": "zenithbook_air_15", "productName": "ZenithBook Air 15 Laptop", "reviewId": "rev004", "reviewer": "ProductivityPro", "date": "2024-05-20", "rating": 5, "sentiment": "positive", "title": "A Powerhouse for Work!", "text": "The ZenithBook Air 15 is fantastic. Lightweight, incredible screen, and it handles all my demanding software without a hiccup. The keyboard is also a joy to type on. Battery life is as advertised. Perfect for professionals." },
+            { "productId": "zenithbook_air_15", "productName": "ZenithBook Air 15 Laptop", "reviewId": "rev005", "reviewer": "StudentLife", "date": "2024-05-05", "rating": 4, "sentiment": "positive", "title": "Excellent for studies, good value", "text": "Got this for college and it's been great. Handles multitasking well, screen is easy on the eyes for long study sessions. It's not the cheapest, but feels like it will last. The RTX 4050 is a nice bonus for some light gaming." },
+            { "productId": "zenithbook_air_15", "productName": "ZenithBook Air 15 Laptop", "reviewId": "rev006", "reviewer": "CreativeCloudUser", "date": "2024-04-22", "rating": 4, "sentiment": "neutral", "title": "Good, but could use more ports", "text": "Performance is solid for video editing and graphic design. The display is color-accurate. My main issue is the limited number of USB-A ports; I often need a dongle. Otherwise, a very capable machine." },
+            { "productId": "serenesound_pro", "productName": "SereneSound Pro Headphones", "reviewId": "rev007", "reviewer": "AudioPhile101", "date": "2024-05-18", "rating": 5, "sentiment": "positive", "title": "Noise Cancellation Bliss!", "text": "These headphones are incredible. The noise cancellation is top-tier, sound quality is rich and balanced. They are super comfortable for long listening sessions. Worth every penny." },
+            { "productId": "serenesound_pro", "productName": "SereneSound Pro Headphones", "reviewId": "rev008", "reviewer": "CommuterCarl", "date": "2024-05-02", "rating": 4, "sentiment": "positive", "title": "Makes my commute so much better", "text": "Blocks out all the train noise perfectly. Battery life is amazing. Call quality is decent too. They are a bit bulky to carry around if not wearing them, but that's a minor point." },
+            { "productId": "serenesound_pro", "productName": "SereneSound Pro Headphones", "reviewId": "rev009", "reviewer": "BudgetBuyer", "date": "2024-04-15", "rating": 3, "sentiment": "negative", "title": "Good sound, but connectivity issues", "text": "The sound is great when they work, but I've had some intermittent Bluetooth connectivity drops with my older phone. For the price, I expected flawless performance. ANC is good though." },
+            { "productId": "aquapure_smart_bottle", "productName": "AquaPure Smart Bottle", "reviewId": "rev010", "reviewer": "HydrationHero", "date": "2024-05-22", "rating": 5, "sentiment": "positive", "title": "Keeps me on track with my water intake!", "text": "Love this smart bottle! The reminders are super helpful, and it's cool to see my hydration stats. The UV purification is a great bonus. Easy to clean too." },
+            { "productId": "aquapure_smart_bottle", "productName": "AquaPure Smart Bottle", "reviewId": "rev011", "reviewer": "FitnessFanatic", "date": "2024-05-12", "rating": 4, "sentiment": "positive", "title": "Innovative and useful", "text": "A bit of a novelty, but genuinely useful for tracking hydration during workouts. The app integration is smooth. Wish the battery lasted a tiny bit longer between charges, but it's not bad." },
+            { "productId": "aquapure_smart_bottle", "productName": "AquaPure Smart Bottle", "reviewId": "rev012", "reviewer": "SkepticalSam", "date": "2024-04-30", "rating": 3, "sentiment": "neutral", "title": "It's a bottle... that glows.", "text": "Does what it says, reminds you to drink. The purification is neat. Is it worth the premium price? I'm on the fence. It's a well-made bottle, but the 'smart' features feel a bit gimmicky for me personally." }
+          ]
+        };
+        const orderDatabase = { /* ... (orderDatabase remains the same) ... */
+            "ORD123XYZ": {
+                orderId: "ORD123XYZ", estimatedShipDate: "2025-05-28", estimatedDeliveryDate: "2025-06-02", currentLocation: "Regional Hub, New Delhi", status: "In Transit",
+                deliveryProgress: [ { location: "Warehouse, Mumbai", timestamp: "2025-05-26 10:00 AM", statusMessage: "Order Packed" }, { location: "Warehouse, Mumbai", timestamp: "2025-05-26 02:00 PM", statusMessage: "Shipped from Warehouse" }, { location: "Regional Hub, Nagpur", timestamp: "2025-05-27 08:00 AM", statusMessage: "Arrived at Hub" }, { location: "Regional Hub, New Delhi", timestamp: "2025-05-28 09:30 AM", statusMessage: "Arrived at Hub, Out for delivery soon" } ],
+                contents: [ { item: "Nova X Pro Smartphone", quantity: 1, customization: "Midnight Blue, 256GB" }, { item: "SereneSound Pro Headphones", quantity: 1, customization: "Graphite" } ],
+                deliveryCustomizations: "Leave at front porch if no one answers. Signature required."
+            },
+            "ORD789ABC": {
+                orderId: "ORD789ABC", estimatedShipDate: "2025-05-25", estimatedDeliveryDate: "2025-05-29", currentLocation: "Local Delivery Center, Anekal", status: "Out for Delivery",
+                deliveryProgress: [ { location: "Warehouse, Bengaluru", timestamp: "2025-05-24 11:00 AM", statusMessage: "Order Packed" }, { location: "Warehouse, Bengaluru", timestamp: "2025-05-24 03:00 PM", statusMessage: "Shipped from Warehouse" }, { location: "Local Delivery Center, Anekal", timestamp: "2025-05-25 07:00 AM", statusMessage: "Arrived at Local Center" }, { location: "Local Delivery Center, Anekal", timestamp: "2025-05-25 09:00 AM", statusMessage: "Out for Delivery" } ],
+                contents: [ { item: "ZenithBook Air 15 Laptop", quantity: 1, customization: "1TB SSD, 32GB RAM upgrade" } ],
+                deliveryCustomizations: "Call on arrival: +91-XXXXXNNNNN"
+            }
+        };
+
+        let conversationHistory = [];
+
+        function displayMessage(message, sender, isHtml = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+
+            let iconHtml = '';
+            if (sender === 'bot' || sender === 'bot-loading' || sender === 'bot-error') {
+                iconHtml = `<svg class="bot-icon" viewBox="0 0 24 24" fill="#1967d2" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v2.14c1.72.45 3 2 3 3.86 0 2.21-1.79 4-4 4s-4-1.79-4-4c0-1.86 1.28-3.41 3-3.86V7zm0 5c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zM12 4.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5S10.5 6.83 10.5 6 9.83 4.5 9 4.5c-.83 0-1.5-.67-1.5-1.5S8.17 1.5 9 1.5c.83 0 1.5.67 1.5 1.5zm0 15c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM4.5 12c0 .83-.67 1.5-1.5 1.5S1.5 12.83 1.5 12c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5zm15 0c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>`;
+            }
+
+            const textContentDiv = document.createElement('div');
+
+            if (sender === 'user') { messageDiv.classList.add('user-message'); }
+            else if (sender === 'bot-error') { messageDiv.classList.add('bot-message', 'error-message'); textContentDiv.innerHTML = iconHtml + message; }
+            else if (sender === 'bot-loading') { messageDiv.classList.add('bot-message', 'loading-message'); textContentDiv.innerHTML = iconHtml + `<div class="typing-indicator"><span></span><span></span><span></span></div> ${message}`; }
+            else if (sender === 'system') { messageDiv.classList.add('system-message'); textContentDiv.textContent = message; }
+            else { messageDiv.classList.add('bot-message'); if (isHtml) textContentDiv.innerHTML = iconHtml + message; else textContentDiv.innerHTML = iconHtml + `<div>${message}</div>`; }
+            
+            if (sender === 'user' || sender === 'system') { if (isHtml) messageDiv.innerHTML = message; else messageDiv.textContent = message; }
+            else { messageDiv.appendChild(textContentDiv); }
+
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function displayTopicChips() {
+            faqTopicChipsContainer.innerHTML = '';
+            for (const categoryName in faqData) {
+                const chip = document.createElement('button');
+                chip.classList.add('topic-chip');
+                chip.textContent = categoryName;
+                chip.setAttribute('aria-label', `View questions about ${categoryName}`);
+                chip.addEventListener('click', () => handleTopicChipClick(categoryName, faqData[categoryName]));
+                faqTopicChipsContainer.appendChild(chip);
+            }
+        }
+
+        function handleTopicChipClick(categoryName, questions) {
+            if (categoryName === "Order Tracking") {
+                if (!orderTrackingHintShown) {
+                    const orderTrackingSpecificHint = "Hint: You can type \"0000\" to see a list of your orders for tracking.";
+                    displayMessage(orderTrackingSpecificHint, 'bot');
+                    conversationHistory.push({ role: "model", parts: [{ text: orderTrackingSpecificHint }] });
+                    orderTrackingHintShown = true;
+                }
+            }
+            displayMessage(`Okay, here are common questions about "${categoryName}":`, 'system');
+            questions.forEach(faq => {
+                const questionButton = document.createElement('button');
+                questionButton.classList.add('clickable-question-in-chat');
+                questionButton.textContent = faq.question;
+                questionButton.setAttribute('aria-label', `Ask: ${faq.question}`);
+                questionButton.addEventListener('click', () => handleFaqClick(faq.question));
+                chatbox.appendChild(questionButton);
+            });
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function handleFaqClick(question) {
+            displayMessage(question, 'user');
+            getBotResponse(question);
+            userInput.value = '';
+        }
+        function findRelevantFaqs(query) {
+            const queryLower = query.toLowerCase();
+            let relevantFaqs = [];
+            for (const category in faqData) {
+                faqData[category].forEach(faq => {
+                    if (faq.keywords.some(keyword => queryLower.includes(keyword.toLowerCase())) || queryLower.includes(faq.question.toLowerCase().substring(0,30))) {
+                        relevantFaqs.push(faq);
+                    }
+                });
+            }
+            return relevantFaqs.slice(0, 3);
+        }
+
+        function findRelevantReviews(userQuery, productName = null) {
+            const queryLower = userQuery.toLowerCase();
+            let relevantReviewsAccumulator = []; 
+
+            if (!reviewData || !reviewData.reviews || !Array.isArray(reviewData.reviews)) {
+                console.error("reviewData.reviews is not properly defined or not an array.");
+                return []; 
+            }
+
+            const productKeywords = productName ? productName.toLowerCase().split(" ") : [];
+
+            reviewData.reviews.forEach(review => {
+                if (!review) return; 
+
+                let matchesByProduct = false;
+                if (productName && review.productName && review.productName.toLowerCase().includes(productName.toLowerCase())) {
+                    matchesByProduct = true;
+                } else if (productName && review.productName && productKeywords.some(pk => review.productName.toLowerCase().includes(pk))) {
+                    matchesByProduct = true;
+                }
+
+                let matchesByQueryContent = false;
+                if (review.text && review.text.toLowerCase().includes(queryLower)) {
+                    matchesByQueryContent = true;
+                }
+                if (review.title && review.title.toLowerCase().includes(queryLower)) { 
+                    matchesByQueryContent = true;
+                }
+
+                const sentimentKeywords = ["opinion", "think of", "people say", "feedback", "reviews for", "complaints", "issues", "good", "bad", "love", "hate"];
+                if (sentimentKeywords.some(sk => queryLower.includes(sk))) {
+                    matchesByQueryContent = true;
+                }
+
+                if (matchesByProduct && matchesByQueryContent) {
+                    relevantReviewsAccumulator.push(review);
+                } else if (matchesByProduct && !matchesByQueryContent && sentimentKeywords.some(sk => queryLower.includes(sk))) {
+                    relevantReviewsAccumulator.push(review);
+                } else if (!productName && matchesByQueryContent) {
+                    relevantReviewsAccumulator.push(review);
+                }
+            });
+            
+            const uniqueReviews = [];
+            const seenReviewIds = new Set();
+            for (const review of relevantReviewsAccumulator) { 
+                if (review && review.reviewId && !seenReviewIds.has(review.reviewId)) {
+                    uniqueReviews.push(review);
+                    seenReviewIds.add(review.reviewId);
+                }
+            }
+            
+            try {
+                uniqueReviews.sort((a, b) => {
+                    const ratingA = typeof a.rating === 'number' ? a.rating : 0;
+                    const ratingB = typeof b.rating === 'number' ? b.rating : 0;
+                    const dateA = a.date ? new Date(a.date).getTime() : 0;
+                    const dateB = b.date ? new Date(b.date).getTime() : 0;
+
+                    if (isNaN(dateA) || isNaN(dateB)) { 
+                        return ratingB - ratingA; 
+                    }
+                    return (ratingB - ratingA) || (dateB - dateA);
+                });
+            } catch (e) {
+                console.error("Error during review sort:", e);
+                return uniqueReviews.slice(0, 3);
+            }
+
+            return uniqueReviews.slice(0, 3);
+        }
+
+        function identifyProductNameInQuery(query) { /* ... (same as before) ... */ }
+        async function fetchGoogleSearchResults(query) { /* ... (same as before) ... */ }
+        async function fetchOrderDetails(orderId) { /* ... (same as before) ... */ }
+        function identifyOrderIdInQuery(query) { /* ... (same as before) ... */ }
+
+        async function getBotResponse(userQuery) {
+            if (userQuery.trim() === VERIFICATION_CODE) {
+                displayMessage("Verification successful! Please select an order to track:", 'system');
+                const orderIds = Object.keys(orderDatabase);
+                if (orderIds.length > 0) {
+                    orderIds.forEach(orderId => {
+                        const orderButton = document.createElement('button');
+                        orderButton.classList.add('clickable-order-id-in-chat');
+                        orderButton.textContent = `Track Order: ${orderId}`;
+                        orderButton.onclick = () => {
+                            const trackQuery = `track order ${orderId}`;
+                            displayMessage(trackQuery, 'user');
+                            getBotResponse(trackQuery);
+                            userInput.value = '';
+                        };
+                        chatbox.appendChild(orderButton);
+                    });
+                } else {
+                    displayMessage("No orders found in the mock database.", 'system');
+                }
+                chatbox.scrollTop = chatbox.scrollHeight;
+                return;
+            }
+
+            displayMessage("Thinking...", "bot-loading");
+
+            const relevantFaqs = findRelevantFaqs(userQuery);
+            let faqContext = "No specific FAQs found for this query in our knowledge base.";
+            if (relevantFaqs.length > 0) {
+                faqContext = "Relevant information from our knowledge base (FAQs):\n" + relevantFaqs.map(faq => `Q: ${faq.question}\nA: ${faq.answer}`).join("\n\n");
+            }
+
+            const identifiedProductName = identifyProductNameInQuery(userQuery);
+            const relevantReviews = findRelevantReviews(userQuery, identifiedProductName); 
+            let reviewContext = "No specific customer reviews found for this query in our records.";
+            if (relevantReviews && relevantReviews.length > 0) { 
+                reviewContext = "Potentially relevant customer reviews from our records" + (identifiedProductName ? ` for ${identifiedProductName}` : "") + ":\n" + relevantReviews.map(r => `Product: ${r.productName || 'N/A'}\nRating: ${r.rating !== undefined ? r.rating : 'N/A'}/5 (${r.sentiment||'N/A'})\nReviewer: ${r.reviewer||'N/A'}\nTitle: ${r.title||'N/A'}\nSummary: "${r.text ? r.text.substring(0, 150) : 'N/A'}..."`).join("\n\n");
+            }
+
+
+            let orderDetailsContext = "No order tracking information requested or found for this specific query turn.";
+            const orderIdFromQuery = identifyOrderIdInQuery(userQuery);
+            if (orderIdFromQuery) {
+                const orderDetails = await fetchOrderDetails(orderIdFromQuery);
+                if (orderDetails) {
+                    orderDetailsContext = `Order Details for #${orderIdFromQuery}:\nStatus: ${orderDetails.status}\nCurrent Location: ${orderDetails.currentLocation}\nEst. Delivery: ${orderDetails.estimatedDeliveryDate}\nContents: ${orderDetails.contents.map(c => `${c.item} (Qty: ${c.quantity}, Customization: ${c.customization || 'N/A'})`).join(', ')}\nDelivery Progress:\n${orderDetails.deliveryProgress.map(p => `  - ${p.timestamp}: ${p.statusMessage} at ${p.location}`).join('\n')}\nCustomizations: ${orderDetails.deliveryCustomizations || 'None'}`;
+                } else {
+                    orderDetailsContext = `Sorry, I could not find any details for order ID #${orderIdFromQuery}. Please double-check the ID or type "${VERIFICATION_CODE}" to see available orders.`;
+                }
+            } else if (userQuery.toLowerCase().includes("track order") || userQuery.toLowerCase().includes("order status")) {
+                orderDetailsContext = `To track an order, please provide your order ID (e.g., 'track my order #ORD123XYZ') or type "${VERIFICATION_CODE}" to see a list of your orders.`;
+            }
+
+            const googleSearchResults = await fetchGoogleSearchResults(userQuery);
+            let googleSearchContext = "No additional information found from external web search at this time.";
+            // ... (googleSearchContext population same as before)
+
+            conversationHistory.push({ role: "user", parts: [{ text: userQuery }] });
+
+            const systemInstruction = `You are a friendly, concise, and helpful customer support AI for an electronics company.
+            Your goal is to assist users with their questions about products, orders, and policies.
+            You have access to four types of information:
+            1.  "Relevant information from our knowledge base (FAQs)": Prioritize this for direct company-specific questions. Specs may include symbols like 📱, ⚙️, 💾, 💽, 📷, 🔋, 💻, 🎮, 🎧, 🤫, ☁️, 🔗, 🎙️.
+            2.  "Potentially relevant customer reviews from our records": Use this for opinions and feedback.
+            3.  "Order Tracking Information": If a user provides an order ID (e.g., #ORD123XYZ), or if they have just selected an order ID after verification, use this context. If no ID is given for a general tracking request, guide them to provide one or use the verification code "${VERIFICATION_CODE}". Present order details clearly.
+            4.  "Information found from an external web search": Use for general knowledge or if internal data is lacking. Mention if using web search.
+
+            If information isn't in these sources or history, state that or ask for clarification. Do not make up info. Focus on the latest question.`;
+
+            let apiCallHistory = [
+                { role: "user", parts: [{ text: systemInstruction }] },
+                { role: "model", parts: [{ text: "Okay, I understand. I'm ready to help based on the provided information and conversation history." }] }
+            ];
+            const historyWindow = conversationHistory.slice(-6);
+            apiCallHistory = apiCallHistory.concat(historyWindow.slice(0, -1));
+
+            const currentTurnPrompt = `Considering the conversation history and the following information:\n---\nInternal FAQ Context:\n${faqContext}\n---\nInternal Customer Review Context:\n${reviewContext}\n---\nOrder Tracking Information:\n${orderDetailsContext}\n---\nExternal Web Search Context:\n${googleSearchContext}\n---\nNow, please answer my latest question: ${userQuery}`;
+            apiCallHistory.push({role: "user", parts: [{text: currentTurnPrompt}] });
+
+            const payload = { contents: apiCallHistory, generationConfig: { temperature: 0.6, topK: 1, topP: 0.9, maxOutputTokens: 450 }};
+
+            const loadingMessages = chatbox.querySelectorAll('.loading-message');
+            loadingMessages.forEach(msg => msg.remove());
+
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) { const errorData = await response.json(); throw new Error(`API request failed: ${response.status} ${response.statusText}. Details: ${JSON.stringify(errorData.error?.message || errorData)}`); }
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+                    const botResponseText = result.candidates[0].content.parts[0].text;
+                    displayMessage(botResponseText, 'bot');
+                    conversationHistory.push({ role: "model", parts: [{ text: botResponseText }] });
+                } else if (result.promptFeedback && result.promptFeedback.blockReason) {
+                    const blockMessage = `I apologize, but I cannot respond to that request due to safety guidelines. Reason: ${result.promptFeedback.blockReason}. Could you please rephrase or ask something else?`;
+                    displayMessage(blockMessage, 'bot-error');
+                    conversationHistory.push({ role: "model", parts: [{ text: blockMessage }] });
+                } else {
+                    displayMessage("I'm sorry, I encountered an issue processing your request. Please try again.", 'bot-error');
+                    conversationHistory.push({ role: "model", parts: [{ text: "Error: Unexpected API response." }] });
+                }
+            } catch (error) {
+                console.error('Error fetching bot response:', error);
+                displayMessage(`I'm having trouble connecting right now. Please try again later. Error: ${error.message}`, 'bot-error');
+            }
+        }
+
+        sendButton.addEventListener('click', () => {
+            const query = userInput.value.trim();
+            if (query) {
+                displayMessage(query, 'user');
+                getBotResponse(query);
+                userInput.value = '';
+            }
+        });
+        userInput.addEventListener('keypress', (event) => { if (event.key === 'Enter') { sendButton.click(); } });
+
+        // --- Initial Setup ---
+        displayTopicChips();
+        // Display a generic initial greeting
+        const initialGreeting = "Hello! I'm your company's support assistant. How can I help you today?";
+        displayMessage(initialGreeting, 'bot');
+        conversationHistory.push({ role: "model", parts: [{ text: initialGreeting }] });
+
+    </script>
+</body>
+</html>
